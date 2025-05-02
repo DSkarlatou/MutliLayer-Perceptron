@@ -1,10 +1,12 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MLP {
 	private static final int d = 2;   //# of inputs
@@ -15,8 +17,8 @@ public class MLP {
 
 	private static final int size = 4000;
 	private static final int batchSize = 2;
-	private static List<String[]> trainContents = new ArrayList<String[]>(size); 
-	private static List<String[]> testContents = new ArrayList<String[]>(size); 
+	private static final List<String[]> trainContents = new ArrayList<>(size);
+	private static final List<String[]> testContents = new ArrayList<>(size);
 	
 	private static final int epochs = 700; 
 	private static final float learningRate = 0.002f;
@@ -27,14 +29,16 @@ public class MLP {
 	private static final String activationFunctionH3 = "tanh"; 
 	private static final String activationFunctionOutput = "relu"; 
 
-	private static int nLayers = 5;
+	private static final int nLayers = 5;
 	private static Layer[][] layers; //1st D for layer, 2nd D for neurons -> layers[1][4] means 1st layer's 4th neuron
 	
-	private static float[][] desiredOutputTrain = new float[size][k];
-	private static float[][] inputDataTrain = new float[size][d];
-	private static float[][] desiredOutputTest = new float[size][k];
-	private static float[][] inputDataTest = new float[size][d];
-		
+	private static final float[][] desiredOutputTrain = new float[size][k];
+	private static final float[][] inputDataTrain = new float[size][d];
+	private static final float[][] desiredOutputTest = new float[size][k];
+	private static final float[][] inputDataTest = new float[size][d];
+
+	private static final Logger LOGGER = Logger.getLogger(MLP.class.getName());
+
 	public static void readFile(String fileName, List<String[]> list)
 	{
 		BufferedReader reader;
@@ -52,7 +56,7 @@ public class MLP {
 			}
 			reader.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOGGER.log(Level.SEVERE, "Failed to read file", e);
 		}
 	}
 	
@@ -87,7 +91,7 @@ public class MLP {
 	
 	private static void gradients(int currLayer, float[] output, float[] desiredO)
 	{
-		float nValue, derivative = 0, gradient = 0;
+		float nValue, derivative, gradient = 0;
 		for(int n = 0; n < layers[currLayer].length; n++)
 		{
 			nValue = layers[currLayer][n].nValue;
@@ -118,44 +122,38 @@ public class MLP {
 
 	public static float activationFunction(String func, float x)
 	{
-		
-		float result = 0;
-		if(func.equals("logistic"))
-			result = (float) (1/(1+Math.exp(-x)));
-		else if(func.equals("relu"))
-			result = x > 0 ? x : 0;
-		else if(func.equals("tanh"))
-			result = (float)Math.tanh(x);
-		
-		return result;
+
+        return switch (func) {
+			case "logistic" -> (float) (1 / (1 + Math.exp(-x)));
+			case "relu" -> x > 0 ? x : 0;
+			case "tanh" -> (float) Math.tanh(x);
+			default -> 0;
+			};
 	}
 	
 	public static float derivativeActivationFunction(String func, float x)
 	{
-		float result = 0;
-		if(func.equals("logistic"))
-			result = x*(1-x);
-		else if(func.equals("relu"))
-			result = x < 0 ? 0 : 1;
-		else if(func.equals("tanh"))
-			result = (float) (1 - Math.pow(x,2));
-		
-		return result;	
+        return switch (func) {
+					case "logistic" -> x * (1 - x);
+					case "relu" -> x < 0 ? 0 : 1;
+					case "tanh" -> (float) (1 - Math.pow(x, 2));
+					default -> 0;
+					};
 	}
 	
 	public static float MSE(float[] output, float[] desiredO)
 	{
 		float result = 0;
-		float difference = 0;
+		float difference;
 		for(int i = 0; i < output.length; i++)
 		{
 			difference = output[i]-desiredO[i];
-			result += 0.5*Math.pow(difference, 2);
+			result += (float) (0.5*Math.pow(difference, 2));
 		}
 		return result;
 	}
 	
-	public static float dotProduct(int length, Layer layers[], float[] weights)
+	public static float dotProduct(int length, Layer[] layers, float[] weights)
 	{
 		float dotProduct = 0;
 		for(int i = 0; i < length; i++)
@@ -168,7 +166,7 @@ public class MLP {
 		layers[0][0].nValue = input[0];
 		layers[0][1].nValue = input[1];
 		float[] output = new float[k];
-		float bias, dotProduct = 0;
+		float bias, dotProduct;
 		for(int i = 1; i < nLayers; i++) 
 			for(int j = 0; j < layers[i].length; j++) 
 			{
@@ -202,8 +200,8 @@ public class MLP {
 	{
 		int epoch = 0;
 		float errorDiff = 999999999, prevE = 999999999;
-		float totalError = 0;
-		float[] output = new float[k];
+		float totalError;
+		float[] output;
 			
 		while(epoch < epochs || errorDiff > terminationThreshold)
 		{
@@ -232,7 +230,7 @@ public class MLP {
 			prevE = totalError;
 		}
 	}
-		
+
 	public static void dataHandling()
 	{
 		for(int i = 0; i < trainContents.size(); i++) 
@@ -253,7 +251,7 @@ public class MLP {
 				break;
 			}
 			
-			//accessing testing's contents
+			//accessing testing contents
 			String[] contentsOfInputTest = Arrays.toString(testContents.get(i)).split(",");	
 			inputDataTest[i][0] = Float.parseFloat(contentsOfInputTest[0].substring(1));
 			inputDataTest[i][1] = Float.parseFloat(contentsOfInputTest[1]);
@@ -299,32 +297,19 @@ public class MLP {
 		System.out.println("Hit percentage: "+(float)correct/size);
 	}
 		
-	public static void main(String[] args)
-	{
+	public static void main(String[] args) throws IOException {
+		//check if files exist
+		File trainingFile = new File("training.txt");
+		File testingFile = new File("testing.txt");
+		if(!trainingFile.exists() && !testingFile.exists()) {
+			CreateDatasets.writeData();
+		}
+
 		readFile("training.txt", trainContents);
 		readFile("testing.txt", testContents);
 		dataHandling();
 		initMemory();
 		train();
 		evaluate();
-	}
-}
-
-
-class Layer {
-	private static final int min = -1;
-	private static final int max = 1;
-
-	float weight[], errors[];
-	float gradient, bias, errBias, dotProduct, nValue;
-	String function = ""; 
-	
-	Layer(int length)
-	{
-		weight = new float[length];
-		errors = new float[length];
-		for(int i = 0; i < length; i++)
-			weight[i] = (float) (min + Math.random() * (max - min));
-		bias = (float) (min + Math.random() * (max - min));
 	}
 }
